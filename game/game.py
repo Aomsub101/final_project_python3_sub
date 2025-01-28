@@ -48,10 +48,12 @@ RECT_HEIGHT = 200
 
 # ----- Color ----- #
 WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
-YELLOW = (255, 255, 0)
-BLUE = (0, 0, 255)
+YELLOW = (253, 208, 23)
+BLUE = (58, 93, 156)
+LIGHT_PURPLE = (203, 195, 227)
 # ------ ---- ----- #
 
 # ----- PROMPTS ----- #
@@ -148,6 +150,7 @@ class Gameplay:
         self.choices = []
         self.correct_answers = []
         self.topic = ""
+        self.q_number = 0
 
     def extract_response(self, response):
         response = response.split('[]')
@@ -168,7 +171,7 @@ class Gameplay:
             self.stage = GameStage.TOPIC
         else:
             self.player.name += event.unicode
-    
+
     def handle_topic_input(self, event):
         if event.key == pygame.K_BACKSPACE:
             self.player.topic = self.player.topic[:-1]
@@ -189,26 +192,41 @@ class Gameplay:
         elif 600 < y < 800 and 500 < x:
             print(f'{mouse_pos} is in bottomright')
 
+    def draw_rotated_square(self, surface, color, center, size, angle):
+        square_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+        pygame.draw.rect(square_surface, color, (0, 0, size, size))  
+        rotated_square = pygame.transform.rotate(square_surface, angle)
+        rect = rotated_square.get_rect(center=center)
+        surface.blit(rotated_square, rect.topleft)
+
+    def draw_text(self, text, color, x, y, x2=0, y2=0):
+        if x2 == 0 and y2 == 0:
+            img = self.font.render(text, True, color)
+            self.surface.blit(img, (x, y))
+        else:
+            pass
+
     def draw_interface(self):
+        pygame.draw.rect(self.surface, WHITE, pygame.Rect(0, 100, QUESTION_WIDTH, QUESTION_HEIGHT))
+        pygame.draw.rect(self.surface, RED, pygame.Rect(0, 400, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, YELLOW, pygame.Rect(0, 600, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, BLUE, pygame.Rect(500, 400, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, GREEN, pygame.Rect(500, 600, RECT_WIDTH, RECT_HEIGHT))
+        triangle_points = [(50, 470), (20, 530), (80, 530)]
+        pygame.draw.polygon(self.surface, WHITE, triangle_points)
+        pygame.draw.circle(self.surface, WHITE, (50, 700), 30)
+        pygame.draw.rect(self.surface, WHITE, pygame.Rect(520, 670, 60, 60))
+        self.draw_rotated_square(self.surface, WHITE, (552, 500), 60, 45)
+
         self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
         self.draw_text(f"Topic: {self.player.topic}", RED, 400, 30)
         self.draw_text(f"Score: {self.player.score}", RED, 850, 30)
-        pygame.draw.rect(self.surface, WHITE, pygame.Rect(0, 100, QUESTION_WIDTH, QUESTION_HEIGHT))
-        pygame.draw.rect(self.surface, RED, pygame.Rect(0, 400, RECT_WIDTH, RECT_HEIGHT))
-        pygame.draw.rect(self.surface, GREEN, pygame.Rect(0, 600, RECT_WIDTH, RECT_HEIGHT))
-        pygame.draw.rect(self.surface, YELLOW, pygame.Rect(500, 400, RECT_WIDTH, RECT_HEIGHT))
-        pygame.draw.rect(self.surface, BLUE, pygame.Rect(500, 600, RECT_WIDTH, RECT_HEIGHT))
-
-    def draw_text(self, text, color, x, y):
-        img = self.font.render(text, True, color)
-        self.surface.blit(img, (x, y))
 
     def start_game(self):
         self.clock.tick(30)
         running = True
-
         while running:
-            self.surface.fill(WHITE)
+            self.surface.fill(LIGHT_PURPLE)
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
