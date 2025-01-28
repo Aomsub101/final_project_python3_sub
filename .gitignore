@@ -2,3 +2,4 @@ test/
 database/
 .env
 flow.txt
+log/

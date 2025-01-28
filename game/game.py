@@ -6,7 +6,25 @@ import json
 import pygame
 from enum import Enum
 from mistralai import Mistral
+import logging
+from logging.handlers import RotatingFileHandler
 # ----- --------- ----- #
+
+# ----- setup logger ----- #
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+handler = RotatingFileHandler(
+    "game.log",
+    maxBytes=1_000_000,
+    backupCount=5
+)
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
+# ----- ------------ ----- #
 
 # ----- setup MistralAi ----- #
 dotenv.load_dotenv()
@@ -37,7 +55,7 @@ BLUE = (0, 0, 255)
 # ------ ---- ----- #
 
 # ----- PROMPTS ----- #
-PROMPTS = """
+PROMPT = """
             Generate 5 questions short quizzes for the topic provided.
             Target **university students aged 18–25**; ensure questions are challenging but fair.  
             Prioritize critical thinking (avoid simple recall; include application, analysis, or hypothetical scenarios).  
@@ -72,6 +90,7 @@ PROMPTS = """
             Below is the user's prompt (ABOVE IS ALL THE EXAMPLE, USE USERS PROMPT to generate the quizzes)
 """
 # ----- ------- ----- #
+
 class Player:
     def __init__(self):
         self.name = ""
@@ -80,7 +99,7 @@ class Player:
 
 class Database:
     def __init__(self):
-        pass
+        self.database = {}
 
     def record_data(self):
         pass
@@ -93,24 +112,23 @@ class MistralAI:
         self.model = MODEL
         self.client = CLIENT
         self.prompt = PROMPT
-        self.questions = []
-        self.choices = []
-        self.correct_answers = []
+
     def call(self, topic):
-        gen_prompt = self.prompt + topic
+        full_prompt = self.prompt + topic
         try:
             response = self.client.chat.complete(
                 model = self.model,
                 messages = [
                     {
                         "role": "user",
-                        "content": gen_prompt,
+                        "content": full_prompt,
                     },
                 ]
             )
+            return response
         except Exception as error:
             print(f"Error calling Mistral API: {error}")
-            return ""
+            return
 
 class GameStage(Enum):
     NAME = "name"
@@ -126,6 +144,21 @@ class Gameplay:
         self.mistral_ai = MistralAI()
         self.stage = GameStage.NAME
         self.player = Player()
+        self.questions = []
+        self.choices = []
+        self.correct_answers = []
+        self.topic = ""
+
+    def extract_response(self, response):
+        response = response.split('[]')
+        self.topic = response[0]
+        self.correct_answers = response[6].split('..')
+        tmp_questions = response[1:6]
+
+        for qt in tmp_questions:
+            question, answer = qt.split('///')
+            self.questions.append(question)
+            self.choices.append(answer.split('..'))
 
     def handle_name_input(self, event):
         if event.key == pygame.K_BACKSPACE:
@@ -144,6 +177,27 @@ class Gameplay:
             self.stage = GameStage.GENERATE_QUIZ
         else:
             self.player.topic += event.unicode
+
+    def handle_quiz_input(self, mouse_pos):
+        x, y = mouse_pos
+        if 400 < y < 600 and x < 500:
+            print(f'{mouse_pos} is in top left')
+        elif 400 < y < 600 and 500 < x:
+            print(f'{mouse_pos} is in top right')
+        elif 600 < y < 800 and x < 500:
+            print(f'{mouse_pos} is in bottomleft')
+        elif 600 < y < 800 and 500 < x:
+            print(f'{mouse_pos} is in bottomright')
+
+    def draw_interface(self):
+        self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
+        self.draw_text(f"Topic: {self.player.topic}", RED, 400, 30)
+        self.draw_text(f"Score: {self.player.score}", RED, 850, 30)
+        pygame.draw.rect(self.surface, WHITE, pygame.Rect(0, 100, QUESTION_WIDTH, QUESTION_HEIGHT))
+        pygame.draw.rect(self.surface, RED, pygame.Rect(0, 400, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, GREEN, pygame.Rect(0, 600, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, YELLOW, pygame.Rect(500, 400, RECT_WIDTH, RECT_HEIGHT))
+        pygame.draw.rect(self.surface, BLUE, pygame.Rect(500, 600, RECT_WIDTH, RECT_HEIGHT))
 
     def draw_text(self, text, color, x, y):
         img = self.font.render(text, True, color)
@@ -166,6 +220,9 @@ class Gameplay:
                         self.handle_name_input(event) 
                     elif self.stage == GameStage.TOPIC:
                         self.handle_topic_input(event)
+                if event.type == pygame.MOUSEBUTTONDOWN and self.stage == GameStage.QUIZ:
+                    mouse_pos = pygame.mouse.get_pos()
+                    self.handle_quiz_input(mouse_pos)
 
             if self.stage == GameStage.NAME:
                 self.draw_text("Welcome to the quiz game!", RED, 50, 50)
@@ -175,16 +232,15 @@ class Gameplay:
                 self.draw_text("What topic do you want to quiz?", RED, 50, 80)
                 self.draw_text(f"Enter topic: {self.player.topic}|", RED, 50, 110)
             elif self.stage == GameStage.GENERATE_QUIZ:
-                self.draw_text(f"generating quizzes, please wait...", RED, 50, 50)
-                self.mistral_ai.call(self.player.topic)
+                self.draw_text("generating quizzes, please wait...", RED, 50, 50)
+                # response = self.mistral_ai.call(self.player.topic)
+                # self.extract_response(response=response)
                 self.stage = GameStage.QUIZ
             elif self.stage == GameStage.QUIZ:
-                self.draw_text(f"Name: {self.player.name}", RED, 50, 50)
-                self.draw_text(f"Topic: {self.player.topic}", RED, 50, 80)
-                self.draw_text(f"here is your quizzes", RED, 50, 110)
+                self.draw_interface()
 
             pygame.display.flip()
-                
+
         pygame.quit()
 
 def main():
