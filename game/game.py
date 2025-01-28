@@ -1,15 +1,23 @@
 
 # ----- Libraries ----- #
-import pygame
 import os
 import dotenv
-from mistralai import Mistral
+import json
+import pygame
 from enum import Enum
+from mistralai import Mistral
 # ----- --------- ----- #
 
-# ----- Environment config ----- #
+# ----- setup MistralAi ----- #
 dotenv.load_dotenv()
+API_KEY = os.environ["MISTRAL_API_KEY"]
+MODEL = "mistral-large-latest"
+CLIENT = Mistral(api_key=API_KEY)
+# ----- ------------------ ----- #
+
+# ----- pygame_init ------ #
 pygame.init()
+# ----- ----------- ------ #
 
 # ----- Constant ----- #
 SURFACE_WIDHT = 1000
@@ -18,7 +26,6 @@ QUESTION_WIDTH = 1000
 QUESTION_HEIGHT = 300
 RECT_WIDTH = 500
 RECT_HEIGHT = 200
-API_KEY = os.environ["MISTRAL_API_KEY"]
 # ----- -------- ----- #
 
 # ----- Color ----- #
@@ -29,21 +36,63 @@ YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 # ------ ---- ----- #
 
+# ----- PROMPTS ----- #
+PROMPTS = """
+            Generate 5 questions short quizzes for the topic provided.
+            Target **university students aged 18–25**; ensure questions are challenging but fair.  
+            Prioritize critical thinking (avoid simple recall; include application, analysis, or hypothetical scenarios).  
+            Use **distractors (wrong choices)** that are plausible to avoid being obvious.
+            The topic will be provided by the users prompt at the bottom of this prompt.
+            I want you to summary the topic, for example, 
+            if I ask "Please generate a quiz about a cat species that is in russia",
+            the topic after summarize should be: "cat species in Russia" or the one that is appropiate.
+            Note: Maximum of topic MUST BE LESS THAN 5 words
+            IMPORTANT*: The topic you summarize must contains only character not special characters.
+            Then start generating 5 quizzes for that topicm follow by 4 choices for the question from 1 to 4.
+            Generate the questions then choices. Then, after generated all questions and choices,
+            give the correct answer by the choice number. For example, if the correct answer is choice number 1,
+            then you should output 1.
 
-
+            The format for output I want:
+                Replace 'question(number)' with the actual question text, followed by '///'.
+                Replace 'choice(number)' with the actual choice text, followed by '..'.
+                Replace 'topic' with the actual summarize topic text, followed by '[]'.
+                Replace 'correct_answer_for_question(number)' with the actual correct answer number, followed by '..'.
+                topic[]question1///choice1..choice2..choice3..choice4[]question2///choice1..choice2..choice3..choice4[]
+                question3///choice1..choice2..choice3..choice4[]question4///choice1..choice2..choice3..choice4[]
+                question5///choice1..choice2..choice3..choice4[]correct_answer_for_question1..correct_answer_for_question2..
+                correct_answer_for_question3..correct_answer_for_question4..correct_answer_for_question5
+            
+            IMPORTANT*:Output must be in the format I provided.
+            IMPORTANT*:Replace each fields with the real value, for example, replace question with the real question
+            IMPORTANT*:Replace choices, topic, and correct answer with the real one as well.
+            IMPORTANT*:Use `///` and `..` and `[]` as a seperator (as shown in the format).
+            IMPORTANT*:When summarize the topic, DO NOT output and AVOID the unnecessary phase like "The summarized topic is: ",
+            just output PURELY THE TOPIC.
+            Below is the user's prompt (ABOVE IS ALL THE EXAMPLE, USE USERS PROMPT to generate the quizzes)
+"""
+# ----- ------- ----- #
 class Player:
     def __init__(self):
         self.name = ""
         self.topic = ""
         self.score = 0
 
+class Database:
+    def __init__(self):
+        pass
+
+    def record_data(self):
+        pass
+
+    def get_data(self):
+        pass
+
 class MistralAI:
     def __init__(self):
-        self.model = "mistral-large-latest"
-        self.client = Mistral(api_key=API_KEY)
-        self.prompt = """
-                        Some prompt
-                        """
+        self.model = MODEL
+        self.client = CLIENT
+        self.prompt = PROMPT
         self.questions = []
         self.choices = []
         self.correct_answers = []
@@ -145,4 +194,3 @@ def main():
 if __name__ == "__main__":
     main()
 # End of file
-
