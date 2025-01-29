@@ -165,6 +165,10 @@ class Gameplay:
             self.q_idx = self.quizzes_data.all_topics.index(self.topic)
         if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] < 10:
             self.use_exist_quiz()
+            logger.info(
+                "Use old quizzes on topic: (%s)",
+                self.topic
+            )
         else:
             self.correct_answers = response[6].split('..')
             tmp_questions = response[1:6]
@@ -173,6 +177,10 @@ class Gameplay:
                 question, answer = qt.split('///')
                 self.questions.append(question)
                 self.choices.append(answer.split('..'))
+            logger.info(
+                "generating new quizzes on topic: (%s)",
+                self.topic
+            )
 
     def handle_name_input(self, event: pygame.event.Event) -> None:
         if event.key == pygame.K_BACKSPACE:
@@ -180,6 +188,7 @@ class Gameplay:
         elif event.key == pygame.K_RETURN:
             print(f"User's name: {self.player.name}")
             self.stage = GameStage.TOPIC
+            logger.info("Player: (%s) play quizzes game.", self.player.name)
         else:
             self.player.name += event.unicode
 
@@ -189,6 +198,7 @@ class Gameplay:
         elif event.key == pygame.K_RETURN:
             print(f"Topic chosen: {self.player.topic}")
             self.stage = GameStage.GENERATE_QUIZ
+            logger.info("Player: (%s) choose topic: (%s)", self.player.name, self.player.topic)
         else:
             self.player.topic += event.unicode
 
@@ -196,20 +206,44 @@ class Gameplay:
         x, y = mouse_pos
         # print(mouse_pos)
         if 400 < y < 600 and x < 500:
+            logger.info(
+                "Player: (%s) select choice: (%d) on question: (%d)",
+                self.player.name, 1, self.q_number+1
+            )
             return 1
         if 400 < y < 600 and 500 < x:
+            logger.info(
+                "Player: (%s) select choice: (%d) on question: (%d)", 
+                self.player.name, 2, self.q_number+1
+            )
             return 2
         if 600 < y < 800 and x < 500:
+            logger.info(
+                "Player: (%s) select choice: (%d) on question: (%d)", 
+                self.player.name, 3, self.q_number+1
+            )
             return 3
         if 600 < y < 800 and 500 < x:
+            logger.info(
+                "Player: (%s) select choice: (%d) on question: (%d)", 
+                self.player.name, 4, self.q_number + 1
+            )
             return 4
 
     def check_answer(self, answer: int) -> None:
         if answer == int(self.correct_answers[self.q_number]):
             self.player.score += 1
             self.stage = GameStage.CORRECT
+            logger.info(
+                "Player: (%s) get a correct answer on question: (%d)",
+                self.player.name, self.q_number + 1
+            )
         else:
             self.stage = GameStage.INCORRECT
+            logger.info(
+                "Player: (%s) get an incorrect answer on question: (%d)",
+                self.player.name, self.q_number + 1
+            )
 
     def show_correct_interface(self) -> None:
         self.draw_text(self.big_font, "CORRECT!", BLACK, 320, 330)
@@ -325,6 +359,10 @@ class Gameplay:
         self.correct_answers = []
         self.is_new_quiz = True
         self.stage = GameStage.END
+        logger.info(
+            "Player: (%s) finish quizzes on topic: (%s) with score: (%d)",
+            self.player.name, self.topic, self.player.score
+        )
 
     def end_game(self) -> None:
         self.draw_text(self.medium_font, f"Name: {self.player.name}", RED, 50, 50)
@@ -342,6 +380,10 @@ class Gameplay:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     running = False
+                    logger.info(
+                        "Player: (%s) exit quizzes game",
+                        self.player.name
+                    )
                     break
 
                 if event.type == pygame.KEYDOWN:
@@ -360,12 +402,20 @@ class Gameplay:
                 if event.type == pygame.KEYDOWN and self.stage == GameStage.END:
                     if event.key == pygame.K_RETURN:
                         running = False
+                        logger.info(
+                            "Player: (%s) exit quizzes game",
+                            self.player.name
+                        )
                         break
                 if event.type == pygame.MOUSEBUTTONDOWN and self.stage == GameStage.END:
                     if event.button == 3:
                         self.stage = GameStage.TOPIC
                         self.player.score = 0
                         self.quizzes_data = Quizzes_data()
+                        logger.info(
+                            "Player: (%s) continue the quizzes game",
+                            self.player.name
+                        )
 
             if self.stage == GameStage.NAME:
                 self.draw_text(self.font, "Welcome to the quiz game!", RED, 50, 50)
