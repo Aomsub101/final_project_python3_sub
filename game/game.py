@@ -53,9 +53,9 @@ RECT_HEIGHT = 200
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
-GREEN = (0, 255, 0)
+GREEN = (0,139,139)
 YELLOW = (253, 208, 23)
-BLUE = (58, 93, 156)
+BLUE = (69,163,229)
 LIGHT_PURPLE = (203, 195, 227)
 # ------ ---- ----- #
 
@@ -169,6 +169,8 @@ class Gameplay:
     def __init__(self):
         self.quizzes_data = Quizzes_data()
         self.font = pygame.font.SysFont(None, 30)
+        self.medium_font = pygame.font.SysFont(None, 60)
+        self.big_font = pygame.font.SysFont(None, 100)
         self.surface = pygame.display.set_mode((SURFACE_WIDHT,SURFACE_HEIGHT))
         self.clock = pygame.time.Clock()
         self.mistral_ai = MistralAI()
@@ -234,7 +236,7 @@ class Gameplay:
             return 3
         if 600 < y < 800 and 500 < x:
             return 4
-    
+
     def check_answer(self, answer):
         if answer == int(self.correct_answers[self.q_number]):
             self.player.score += 1
@@ -243,15 +245,15 @@ class Gameplay:
             self.stage = GameStage.INCORRECT
 
     def show_correct_interface(self):
-        self.draw_text("CORRECT!", BLACK, 320, 330)
-        self.draw_text("PRESS-ENTER TO CONTINUE", BLACK, 360, 470)
+        self.draw_text(self.big_font, "CORRECT!", BLACK, 320, 330)
+        self.draw_text(self.font, "PRESS-ENTER TO CONTINUE", BLACK, 360, 470)
 
     def show_incorrect_interface(self):
-        self.draw_text("INCORRECT!", BLACK, 300, 330)
+        self.draw_text(self.big_font, "INCORRECT!", BLACK, 300, 330)
         correct_choice = int(self.correct_answers[self.q_number]) - 1
         text = f"Correct answer is: {self.choices[self.q_number][correct_choice]}"
-        self.draw_text(text, RED, 300, 400, 740, 600)
-        self.draw_text("PRESS-ENTER TO CONTINUE", BLACK, 360, 500)
+        self.draw_text(self.font, text, RED, 300, 400, 740, 600)
+        self.draw_text(self.font, "PRESS-ENTER TO CONTINUE", BLACK, 360, 500)
 
     def draw_rotated_square(self, surface, color, center, size, angle):
         square_surface = pygame.Surface((size, size), pygame.SRCALPHA)
@@ -260,28 +262,40 @@ class Gameplay:
         rect = rotated_square.get_rect(center=center)
         surface.blit(rotated_square, rect.topleft)
 
-    def draw_text(self, text, color, x1, y1, x2=0, y2=0):
-        if text in ["CORRECT!", "INCORRECT!"]:
-            tmp_font = pygame.font.SysFont(None, 100)
-            img = tmp_font.render(text, True, color)
-            self.surface.blit(img, (x1, y1))
-        elif x2 == 0 and y2 == 0:
-            img = self.font.render(text, True, color)
+    def draw_text(self, font, text, color, x1, y1, x2=0, y2=0, is_choice=False):
+        if x2 == 0 and y2 == 0:
+            img = font.render(text, True, color)
             self.surface.blit(img, (x1, y1))
         else:
             words = text.split(' ')
-            space_width = self.font.size(' ')[0]  # Width of a space character
-            max_width = x2 - x1
+            space_width = font.size(' ')[0]  # Width of a space character
+            if is_choice:
+                max_width = x2 - x1
+                total_width = 0
+                for word in words:
+                    word_width, word_height = font.size(word)
+                    total_width += word_width
+                    total_width += space_width
+                total_width -= space_width 
+
+                lines = total_width / max_width
+                if 2 > lines > 1:
+                    y1 -= 10
+                elif 3 > lines > 2:
+                    y1 -= 20
+                elif lines > 3:
+                    y1 -= 30
+
             x, y = x1, y1
 
             for word in words:
-                word_width, word_height = self.font.size(word)
+                word_width, word_height = font.size(word)
                 if x + word_width > x2:
                     x = x1
                     y += word_height
                 if y + word_height > y2:
                     break
-                img = self.font.render(word, True, color)
+                img = font.render(word, True, color)
                 self.surface.blit(img, (x, y))
                 x += word_width + space_width
 
@@ -305,16 +319,16 @@ class Gameplay:
 
         self.draw_decorative()
 
-        self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
-        self.draw_text(f"Question No.{self.q_number+1}", RED, 400, 30)
-        self.draw_text(f"Score: {self.player.score}/5", RED, 850, 30)
+        self.draw_text(self.font, f"Name: {self.player.name}", RED, 50, 30)
+        self.draw_text(self.font, f"Question No.{self.q_number+1}", RED, 400, 30)
+        self.draw_text(self.font, f"Score: {self.player.score}/5", RED, 850, 30)
 
         # st_pos = self.dynamic_text_display_handler()
-        self.draw_text(self.questions[self.q_number], WHITE, 50, 150, 950, 350)
-        self.draw_text(self.choices[self.q_number][0], WHITE, 100, 450, 450, 550)
-        self.draw_text(self.choices[self.q_number][1], WHITE, 600, 450, 950, 550)
-        self.draw_text(self.choices[self.q_number][2], WHITE, 100, 650, 450, 750)
-        self.draw_text(self.choices[self.q_number][3], WHITE, 600, 650, 950, 750)
+        self.draw_text(self.font, f"Question: {self.questions[self.q_number]}", WHITE, 50, 150, 950, 350)
+        self.draw_text(self.font, self.choices[self.q_number][0], WHITE, 100, 490, 450, 550, is_choice=True)
+        self.draw_text(self.font, self.choices[self.q_number][1], WHITE, 600, 490, 950, 550, is_choice=True)
+        self.draw_text(self.font, self.choices[self.q_number][2], WHITE, 100, 690, 450, 750, is_choice=True)
+        self.draw_text(self.font, self.choices[self.q_number][3], WHITE, 600, 690, 950, 750, is_choice=True)
 
     def make_json(self):
         data = {
@@ -338,11 +352,11 @@ class Gameplay:
         self.stage = GameStage.END
 
     def end_game(self):
-        self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
-        self.draw_text(f"Topic: {self.player.topic}", RED, 50, 100)
-        self.draw_text(f"Final Score: {self.player.score}/5", RED, 50, 200)
-        self.draw_text("RIGHT-CLICK TO CONTINUE PLAYING", BLACK, 320, 550)
-        self.draw_text("PRESS-ENTER TO END GAME", BLACK, 360, 600)
+        self.draw_text(self.medium_font, f"Name: {self.player.name}", RED, 50, 50)
+        self.draw_text(self.medium_font, f"Topic: {self.player.topic}", RED, 50, 120)
+        self.draw_text(self.medium_font, f"Final Score: {self.player.score}/5", RED, 50, 190)
+        self.draw_text(self.font, "RIGHT-CLICK TO CONTINUE PLAYING", BLACK, 320, 550)
+        self.draw_text(self.font, "PRESS-ENTER TO END GAME", BLACK, 360, 600)
 
     def start_game(self):
         self.clock.tick(30)
@@ -379,24 +393,23 @@ class Gameplay:
                         self.quizzes_data = Quizzes_data()
 
             if self.stage == GameStage.NAME:
-                self.draw_text("Welcome to the quiz game!", RED, 50, 50)
-                self.draw_text(f"Please enter your name: {self.player.name}|", RED, 50, 80)
+                self.draw_text(self.font, "Welcome to the quiz game!", RED, 50, 50)
+                self.draw_text(self.font, f"Please enter your name: {self.player.name}|", RED, 50, 80)
             elif self.stage == GameStage.TOPIC:
-                self.draw_text(f"Hi! {self.player.name}", RED, 50, 50)
-                self.draw_text("What topic do you want to quiz?", RED, 50, 80)
-                self.draw_text(f"Enter topic: {self.player.topic}|", RED, 50, 110)
+                self.draw_text(self.font, f"Hi! {self.player.name}", RED, 50, 50)
+                self.draw_text(self.font, "What topic do you want to quiz?", RED, 50, 80)
+                self.draw_text(self.font, f"Enter topic: {self.player.topic}|", RED, 50, 110)
             elif self.stage == GameStage.GENERATE_QUIZ:
                 print(f"generating quizzes for {self.player.topic}, please wait...")
-                self.draw_text("generating quizzes, please wait...", RED, 50, 50)
+                self.draw_text(self.font, "generating quizzes, please wait...", RED, 50, 50)
                 response = self.mistral_ai.call(self.player.topic)
                 logger.info(response)
                 self.extract_response(response=response)
                 self.stage = GameStage.QUIZ
             elif self.stage == GameStage.QUIZ:
-                if self.q_number < 5:
-                    self.draw_interface()
-                else:
+                if self.q_number >= 5:
                     self.stage = GameStage.UPDATE
+                self.draw_interface()
             elif self.stage == GameStage.CORRECT:
                 self.show_correct_interface()
             elif self.stage == GameStage.INCORRECT:
