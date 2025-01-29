@@ -17,7 +17,7 @@ dotenv.load_dotenv()
 # ----- setup logger ----- #
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-LOG_PATH=os.environ["LOG_PATH"] + "//game.log"
+LOG_PATH = os.environ["LOG_PATH"] + "//game.log"
 handler = RotatingFileHandler(
     LOG_PATH,
     maxBytes=1_000_000,
@@ -58,6 +58,10 @@ YELLOW = (253, 208, 23)
 BLUE = (58, 93, 156)
 LIGHT_PURPLE = (203, 195, 227)
 # ------ ---- ----- #
+
+# ----- JSON path ----- #
+DATA_PATH = os.environ["JSON_PATH"] + "//quizzes_data.json"
+# ----- --------- ----- #
 
 # ----- PROMPTS ----- #
 PROMPT = """
@@ -103,15 +107,30 @@ class Player:
         self.topic = ""
         self.score = 0
 
-class Database:
+class Quizzes_data:
     def __init__(self):
-        self.database = {}
+        self.my_data = self.get_data()
+        self.all_topics = self.my_data["all_topics"]
+        self.all_quizzes = self.my_data["all_quizzes"]
 
-    def record_data(self):
-        pass
+    def record_data(self, is_new_quiz, q_idx, topic, data):
+        if not is_new_quiz:
+            if not self.all_quizzes[q_idx]["use_count"] >= 10:
+                data["total_score"] += self.all_quizzes[q_idx]["total_score"]
+                data["use_count"] = self.all_quizzes[q_idx]["use_count"] + 1
+            data["correct_percentage"] = 100 * (data["total_score"] / (5*data["use_count"]))
+            self.my_data["all_quizzes"][q_idx] = data
+            with open(DATA_PATH, "w") as file:
+                json.dump(self.my_data, file, indent=4)
+        else:
+            self.my_data["all_quizzes"].append(data)
+            self.my_data["all_topics"].append(topic)
+            with open(DATA_PATH, "w") as file:
+                json.dump(self.my_data, file, indent=4)
 
     def get_data(self):
-        pass
+        with open(DATA_PATH, "r") as file:
+            return json.load(file)
 
 class MistralAI:
     def __init__(self):
@@ -120,7 +139,7 @@ class MistralAI:
         self.prompt = PROMPT
 
     def call(self, topic):
-        full_prompt = self.prompt + topic
+        full_prompt = self.prompt + "\nUSER PROMPT:" + topic
         try:
             response = self.client.chat.complete(
                 model = self.model,
@@ -143,9 +162,12 @@ class GameStage(Enum):
     QUIZ = "quiz"
     CORRECT = "correct_answer"
     INCORRECT = "incorrect_answer"
+    UPDATE = "update"
     END = "end"
+
 class Gameplay:
     def __init__(self):
+        self.quizzes_data = Quizzes_data()
         self.font = pygame.font.SysFont(None, 30)
         self.surface = pygame.display.set_mode((SURFACE_WIDHT,SURFACE_HEIGHT))
         self.clock = pygame.time.Clock()
@@ -157,17 +179,31 @@ class Gameplay:
         self.correct_answers = []
         self.topic = ""
         self.q_number = 0
+        self.is_new_quiz = True
+        self.q_idx = 0
+
+    def use_exist_quiz(self):
+        self.questions = self.quizzes_data.all_quizzes[self.q_idx]["questions"]
+        self.choices = self.quizzes_data.all_quizzes[self.q_idx]["choices"]
+        self.correct_answers = self.quizzes_data.all_quizzes[self.q_idx]["correct_answers"]
 
     def extract_response(self, response):
         response = response.split('[]')
         self.topic = response[0]
-        self.correct_answers = response[6].split('..')
-        tmp_questions = response[1:6]
+        self.player.topic = self.topic
+        if self.topic in self.quizzes_data.all_topics:
+            self.is_new_quiz = False
+            self.q_idx = self.quizzes_data.all_topics.index(self.topic)
+        if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] < 10:
+            self.use_exist_quiz()
+        else:
+            self.correct_answers = response[6].split('..')
+            tmp_questions = response[1:6]
 
-        for qt in tmp_questions:
-            question, answer = qt.split('///')
-            self.questions.append(question)
-            self.choices.append(answer.split('..'))
+            for qt in tmp_questions:
+                question, answer = qt.split('///')
+                self.questions.append(question)
+                self.choices.append(answer.split('..'))
 
     def handle_name_input(self, event):
         if event.key == pygame.K_BACKSPACE:
@@ -208,14 +244,14 @@ class Gameplay:
 
     def show_correct_interface(self):
         self.draw_text("CORRECT!", BLACK, 320, 330)
-        self.draw_text("RIGHT-CLICK TO CONTINUE", BLACK, 360, 470)
+        self.draw_text("PRESS-ENTER TO CONTINUE", BLACK, 360, 470)
 
     def show_incorrect_interface(self):
         self.draw_text("INCORRECT!", BLACK, 300, 330)
         correct_choice = int(self.correct_answers[self.q_number]) - 1
         text = f"Correct answer is: {self.choices[self.q_number][correct_choice]}"
         self.draw_text(text, RED, 300, 400, 740, 600)
-        self.draw_text("RIGHT-CLICK TO CONTINUE", BLACK, 360, 500)
+        self.draw_text("PRESS-ENTER TO CONTINUE", BLACK, 360, 500)
 
     def draw_rotated_square(self, surface, color, center, size, angle):
         square_surface = pygame.Surface((size, size), pygame.SRCALPHA)
@@ -256,30 +292,55 @@ class Gameplay:
         pygame.draw.rect(self.surface, WHITE, pygame.Rect(520, 670, 60, 60))
         self.draw_rotated_square(self.surface, WHITE, (552, 500), 60, 45)
 
+    def dynamic_text_display_handler(self):
+        pos = []
+        return pos
+
     def draw_interface(self):
         pygame.draw.rect(self.surface, LIGHT_PURPLE, pygame.Rect(0, 100, QUESTION_WIDTH, QUESTION_HEIGHT))
         pygame.draw.rect(self.surface, RED, pygame.Rect(0, 400, RECT_WIDTH, RECT_HEIGHT))
         pygame.draw.rect(self.surface, YELLOW, pygame.Rect(0, 600, RECT_WIDTH, RECT_HEIGHT))
         pygame.draw.rect(self.surface, BLUE, pygame.Rect(500, 400, RECT_WIDTH, RECT_HEIGHT))
         pygame.draw.rect(self.surface, GREEN, pygame.Rect(500, 600, RECT_WIDTH, RECT_HEIGHT))
-        
+
         self.draw_decorative()
 
         self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
-        # self.draw_text(f"Topic: {self.player.topic}", RED, 400, 30)
-        self.draw_text(f"Score: {self.player.score}", RED, 850, 30)
+        self.draw_text(f"Question No.{self.q_number+1}", RED, 400, 30)
+        self.draw_text(f"Score: {self.player.score}/5", RED, 850, 30)
 
+        # st_pos = self.dynamic_text_display_handler()
         self.draw_text(self.questions[self.q_number], WHITE, 50, 150, 950, 350)
         self.draw_text(self.choices[self.q_number][0], WHITE, 100, 450, 450, 550)
         self.draw_text(self.choices[self.q_number][1], WHITE, 600, 450, 950, 550)
         self.draw_text(self.choices[self.q_number][2], WHITE, 100, 650, 450, 750)
         self.draw_text(self.choices[self.q_number][3], WHITE, 600, 650, 950, 750)
-    
-    def show_result(self):
+
+    def make_json(self):
+        data = {
+            "questions": self.questions,
+            "choices": self.choices,
+            "correct_answers": self.correct_answers,
+            "use_count": 1,
+            "total_score": self.player.score,
+            "correct_percentage": 0
+        }
+        return data
+
+    def update(self):
+        data = self.make_json()
+        self.quizzes_data.record_data(self.is_new_quiz, self.q_idx, self.topic, data)
+        self.choices = []
+        self.questions = []
+        self.q_number = 0
+        self.correct_answers = []
+        self.is_new_quiz = True
+        self.stage = GameStage.END
+
+    def end_game(self):
         self.draw_text(f"Name: {self.player.name}", RED, 50, 30)
         self.draw_text(f"Topic: {self.player.topic}", RED, 50, 100)
-        self.draw_text(f"Final Score: {self.player.score}", RED, 50, 200)
-
+        self.draw_text(f"Final Score: {self.player.score}/5", RED, 50, 200)
         self.draw_text("RIGHT-CLICK TO CONTINUE PLAYING", BLACK, 320, 550)
         self.draw_text("PRESS-ENTER TO END GAME", BLACK, 360, 600)
 
@@ -303,17 +364,19 @@ class Gameplay:
                     mouse_pos = pygame.mouse.get_pos()
                     answer = self.handle_quiz_input(mouse_pos)
                     self.check_answer(answer)
-                if event.type == pygame.MOUSEBUTTONDOWN and self.stage in [GameStage.CORRECT, GameStage.INCORRECT]:
-                    if event.button == 3:
+                if event.type == pygame.KEYDOWN and self.stage in [GameStage.CORRECT, GameStage.INCORRECT]:
+                    if event.key == pygame.K_RETURN:
                         self.stage = GameStage.QUIZ
                         self.q_number += 1
-                if event.type in [pygame.KEYDOWN, pygame.MOUSEBUTTONDOWN] and self.stage == GameStage.END:
+                if event.type == pygame.KEYDOWN and self.stage == GameStage.END:
                     if event.key == pygame.K_RETURN:
                         running = False
                         break
+                if event.type == pygame.MOUSEBUTTONDOWN and self.stage == GameStage.END:
                     if event.button == 3:
                         self.stage = GameStage.TOPIC
-
+                        self.player.score = 0
+                        self.quizzes_data = Quizzes_data()
 
             if self.stage == GameStage.NAME:
                 self.draw_text("Welcome to the quiz game!", RED, 50, 50)
@@ -323,7 +386,7 @@ class Gameplay:
                 self.draw_text("What topic do you want to quiz?", RED, 50, 80)
                 self.draw_text(f"Enter topic: {self.player.topic}|", RED, 50, 110)
             elif self.stage == GameStage.GENERATE_QUIZ:
-                print("generating quizzes, please wait...")
+                print(f"generating quizzes for {self.player.topic}, please wait...")
                 self.draw_text("generating quizzes, please wait...", RED, 50, 50)
                 response = self.mistral_ai.call(self.player.topic)
                 logger.info(response)
@@ -333,13 +396,15 @@ class Gameplay:
                 if self.q_number < 5:
                     self.draw_interface()
                 else:
-                    self.stage = GameStage.END
+                    self.stage = GameStage.UPDATE
             elif self.stage == GameStage.CORRECT:
                 self.show_correct_interface()
             elif self.stage == GameStage.INCORRECT:
                 self.show_incorrect_interface()
+            elif self.stage == GameStage.UPDATE:
+                self.update()
             elif self.stage == GameStage.END:
-                self.show_result()
+                self.end_game()
 
             pygame.display.flip()
 
