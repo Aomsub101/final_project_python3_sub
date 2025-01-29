@@ -59,47 +59,10 @@ BLUE = (69,163,229)
 LIGHT_PURPLE = (203, 195, 227)
 # ------ ---- ----- #
 
-# ----- JSON path ----- #
-DATA_PATH = os.environ["JSON_PATH"] + "//quizzes_data.json"
+# ----- path ----- #
+DATA_PATH = os.environ["DATABASE_PATH"] + "//quizzes_data.json"
+PROMPT_PATH = os.environ["DATABASE_PATH"] + "//prompt.txt"
 # ----- --------- ----- #
-
-# ----- PROMPTS ----- #
-PROMPT = """
-            Generate 5 questions short quizzes for the topic provided.
-            Target **university students aged 18–25**; ensure questions are challenging but fair.  
-            Prioritize critical thinking (avoid simple recall; include application, analysis, or hypothetical scenarios).  
-            Use **distractors (wrong choices)** that are plausible to avoid being obvious.
-            The topic will be provided by the users prompt at the bottom of this prompt.
-            I want you to summary the topic, for example, 
-            if I ask "Please generate a quiz about a cat species that is in russia",
-            the topic after summarize should be: "cat species in Russia" or the one that is appropiate.
-            Note: Maximum of topic MUST BE LESS THAN 5 words
-            IMPORTANT*: The topic you summarize must contains only character not special characters.
-            Then start generating 5 quizzes for that topicm follow by 4 choices for the question from 1 to 4.
-            Generate the questions then choices. Then, after generated all questions and choices,
-            give the correct answer by the choice number. For example, if the correct answer is choice number 1,
-            then you should output 1.
-
-            The format for output you MUST USE NO EXCEPTION:
-                REPLACE 'question(number)' with the actual question text, followed by '///'.
-                REPLACE 'choice(number)' with the actual choice text, followed by '..'.
-                REPLACE 'topic' with the actual summarize topic text, followed by '[]'.
-                REPLACE 'correct_answer_for_question(number)' with the actual correct answer number, followed by '..'.
-                topic[]question1///choice1..choice2..choice3..choice4[]question2///choice1..choice2..choice3..choice4[]
-                question3///choice1..choice2..choice3..choice4[]question4///choice1..choice2..choice3..choice4[]
-                question5///choice1..choice2..choice3..choice4[]correct_answer_for_question1..correct_answer_for_question2..
-                correct_answer_for_question3..correct_answer_for_question4..correct_answer_for_question5
-            Example output (YOU MUST NOT COPY THIS OUTPUT EVENTHOUGH IT IS THE SAME TOPIC):
-            football player[]Which football player is known for their significant impact on the field despite their relatively short stature, often being cited as an example of how height is not a critical factor in football success?///Lionel Messi..Cristiano Ronaldo..Diego Maradona..Zinedine Zidane[]Which player is renowned for their exceptional free-kick abilities, often scoring from long distances with remarkable accuracy?///David Beckham..Roberto Carlos..Juninho Pernambucano..Andrea Pirlo[]Imagine a scenario where a football team is down by one goal with only five minutes left in the game. Which player would you want on your team for their known ability to score crucial late goals?///Sergio Aguero..Robert Lewandowski..Didier Drogba..Zlatan Ibrahimovic[]Which player is famous for their dribbling skills and is often compared to a "magician" on the field for their ability to create scoring opportunities out of seemingly impossible situations?///Ronaldinho..Neymar..Eden Hazard..Luis Suarez[]Which player is recognized for their leadership and defensive prowess, often being the backbone of their team's defense and a key figure in organizing the team's strategy?///Franz Beckenbauer..Paolo Maldini..Sergio Ramos..Virgil van Dijk[]1..3..2..1..4
-            IMPORTANT*:Output must be in the format I provided.
-            IMPORTANT*:REPLACE each fields with the real value, for example, REPLACE question with the real question
-            IMPORTANT*:REPLACE choices, topic, and correct answer with the real one as well.
-            IMPORTANT*:Use `///` and `..` and `[]` as a seperator (as shown in the format).
-            IMPORTANT*:When summarize the topic, DO NOT output and AVOID the unnecessary phase like "The summarized topic is: ",
-            just output PURELY THE TOPIC.
-            Below is the user's prompt (ABOVE IS ALL THE EXAMPLE, USE USERS PROMPT to generate the quizzes)
-"""
-# ----- ------- ----- #
 
 class Player:
     def __init__(self):
@@ -108,12 +71,12 @@ class Player:
         self.score = 0
 
 class Quizzes_data:
-    def __init__(self):
+    def __init__(self) -> None:
         self.my_data = self.get_data()
         self.all_topics = self.my_data["all_topics"]
         self.all_quizzes = self.my_data["all_quizzes"]
 
-    def record_data(self, is_new_quiz, q_idx, topic, data):
+    def record_data(self, is_new_quiz: bool, q_idx: int, topic: str, data: dict[str, any]) -> None:
         if not is_new_quiz:
             if not self.all_quizzes[q_idx]["use_count"] >= 10:
                 data["total_score"] += self.all_quizzes[q_idx]["total_score"]
@@ -128,17 +91,18 @@ class Quizzes_data:
             with open(DATA_PATH, "w") as file:
                 json.dump(self.my_data, file, indent=4)
 
-    def get_data(self):
+    def get_data(self) -> dict[str, any]:
         with open(DATA_PATH, "r") as file:
             return json.load(file)
 
 class MistralAI:
-    def __init__(self):
+    def __init__(self) -> None:
         self.model = MODEL
         self.client = CLIENT
-        self.prompt = PROMPT
+        with open(PROMPT_PATH, "r") as file:
+            self.prompt = file.read()
 
-    def call(self, topic):
+    def call(self, topic: str) -> str:
         full_prompt = self.prompt + "\nUSER PROMPT:" + topic
         try:
             response = self.client.chat.complete(
@@ -166,16 +130,11 @@ class GameStage(Enum):
     END = "end"
 
 class Gameplay:
-    def __init__(self):
+    def __init__(self) -> None:
         self.quizzes_data = Quizzes_data()
-        self.font = pygame.font.SysFont(None, 30)
-        self.medium_font = pygame.font.SysFont(None, 60)
-        self.big_font = pygame.font.SysFont(None, 100)
-        self.surface = pygame.display.set_mode((SURFACE_WIDHT,SURFACE_HEIGHT))
-        self.clock = pygame.time.Clock()
         self.mistral_ai = MistralAI()
-        self.stage = GameStage.NAME
         self.player = Player()
+        self.stage = GameStage.NAME
         self.questions = []
         self.choices = []
         self.correct_answers = []
@@ -183,13 +142,20 @@ class Gameplay:
         self.q_number = 0
         self.is_new_quiz = True
         self.q_idx = 0
+    
+    def setup_display(self) -> None:
+        self.clock = pygame.time.Clock()
+        self.font = pygame.font.SysFont(None, 30)
+        self.medium_font = pygame.font.SysFont(None, 60)
+        self.big_font = pygame.font.SysFont(None, 100)
+        self.surface = pygame.display.set_mode((SURFACE_WIDHT,SURFACE_HEIGHT))
 
-    def use_exist_quiz(self):
+    def use_exist_quiz(self) -> None:
         self.questions = self.quizzes_data.all_quizzes[self.q_idx]["questions"]
         self.choices = self.quizzes_data.all_quizzes[self.q_idx]["choices"]
         self.correct_answers = self.quizzes_data.all_quizzes[self.q_idx]["correct_answers"]
 
-    def extract_response(self, response):
+    def extract_response(self, response: str) -> None:
         response = response.split('[]')
         self.topic = response[0]
         self.player.topic = self.topic
@@ -207,7 +173,7 @@ class Gameplay:
                 self.questions.append(question)
                 self.choices.append(answer.split('..'))
 
-    def handle_name_input(self, event):
+    def handle_name_input(self, event: pygame.event.Event) -> None:
         if event.key == pygame.K_BACKSPACE:
             self.player.name = self.player.name[:-1]
         elif event.key == pygame.K_RETURN:
@@ -216,7 +182,7 @@ class Gameplay:
         else:
             self.player.name += event.unicode
 
-    def handle_topic_input(self, event):
+    def handle_topic_input(self, event: pygame.event.Event) -> None:
         if event.key == pygame.K_BACKSPACE:
             self.player.topic = self.player.topic[:-1]
         elif event.key == pygame.K_RETURN:
@@ -225,7 +191,7 @@ class Gameplay:
         else:
             self.player.topic += event.unicode
 
-    def handle_quiz_input(self, mouse_pos):
+    def handle_quiz_input(self, mouse_pos: tuple[int, int]) -> int:
         x, y = mouse_pos
         # print(mouse_pos)
         if 400 < y < 600 and x < 500:
@@ -237,32 +203,44 @@ class Gameplay:
         if 600 < y < 800 and 500 < x:
             return 4
 
-    def check_answer(self, answer):
+    def check_answer(self, answer: int) -> None:
         if answer == int(self.correct_answers[self.q_number]):
             self.player.score += 1
             self.stage = GameStage.CORRECT
         else:
             self.stage = GameStage.INCORRECT
 
-    def show_correct_interface(self):
+    def show_correct_interface(self) -> None:
         self.draw_text(self.big_font, "CORRECT!", BLACK, 320, 330)
         self.draw_text(self.font, "PRESS-ENTER TO CONTINUE", BLACK, 360, 470)
 
-    def show_incorrect_interface(self):
+    def show_incorrect_interface(self) -> None:
         self.draw_text(self.big_font, "INCORRECT!", BLACK, 300, 330)
         correct_choice = int(self.correct_answers[self.q_number]) - 1
         text = f"Correct answer is: {self.choices[self.q_number][correct_choice]}"
         self.draw_text(self.font, text, RED, 300, 400, 740, 600)
         self.draw_text(self.font, "PRESS-ENTER TO CONTINUE", BLACK, 360, 500)
 
-    def draw_rotated_square(self, surface, color, center, size, angle):
+    def draw_rotated_square(self,
+                            surface: pygame.Surface,
+                            color: tuple[int, int, int],
+                            center: int,
+                            size: int,
+                            angle: float) -> None:
         square_surface = pygame.Surface((size, size), pygame.SRCALPHA)
         pygame.draw.rect(square_surface, color, (0, 0, size, size))  
         rotated_square = pygame.transform.rotate(square_surface, angle)
         rect = rotated_square.get_rect(center=center)
         surface.blit(rotated_square, rect.topleft)
 
-    def draw_text(self, font, text, color, x1, y1, x2=0, y2=0, is_choice=False):
+    def draw_text(self, font: pygame.font.Font,
+                  text: str,
+                  color: tuple[int, int, int],
+                  x1: int,
+                  y1: int,
+                  x2: int=0,
+                  y2: int=0,
+                  is_choice: bool=False) -> None:
         if x2 == 0 and y2 == 0:
             img = font.render(text, True, color)
             self.surface.blit(img, (x1, y1))
@@ -299,18 +277,14 @@ class Gameplay:
                 self.surface.blit(img, (x, y))
                 x += word_width + space_width
 
-    def draw_decorative(self):
+    def draw_decorative(self) -> None:
         triangle_points = [(50, 470), (20, 530), (80, 530)]
         pygame.draw.polygon(self.surface, WHITE, triangle_points)
         pygame.draw.circle(self.surface, WHITE, (50, 700), 30)
         pygame.draw.rect(self.surface, WHITE, pygame.Rect(520, 670, 60, 60))
         self.draw_rotated_square(self.surface, WHITE, (552, 500), 60, 45)
 
-    def dynamic_text_display_handler(self):
-        pos = []
-        return pos
-
-    def draw_interface(self):
+    def draw_interface(self) -> None:
         pygame.draw.rect(self.surface, LIGHT_PURPLE, pygame.Rect(0, 100, QUESTION_WIDTH, QUESTION_HEIGHT))
         pygame.draw.rect(self.surface, RED, pygame.Rect(0, 400, RECT_WIDTH, RECT_HEIGHT))
         pygame.draw.rect(self.surface, YELLOW, pygame.Rect(0, 600, RECT_WIDTH, RECT_HEIGHT))
@@ -330,7 +304,7 @@ class Gameplay:
         self.draw_text(self.font, self.choices[self.q_number][2], WHITE, 100, 690, 450, 750, is_choice=True)
         self.draw_text(self.font, self.choices[self.q_number][3], WHITE, 600, 690, 950, 750, is_choice=True)
 
-    def make_json(self):
+    def make_json(self) -> dict[str, any]:
         data = {
             "questions": self.questions,
             "choices": self.choices,
@@ -341,7 +315,7 @@ class Gameplay:
         }
         return data
 
-    def update(self):
+    def update(self) -> None:
         data = self.make_json()
         self.quizzes_data.record_data(self.is_new_quiz, self.q_idx, self.topic, data)
         self.choices = []
@@ -351,14 +325,14 @@ class Gameplay:
         self.is_new_quiz = True
         self.stage = GameStage.END
 
-    def end_game(self):
+    def end_game(self) -> None:
         self.draw_text(self.medium_font, f"Name: {self.player.name}", RED, 50, 50)
         self.draw_text(self.medium_font, f"Topic: {self.player.topic}", RED, 50, 120)
         self.draw_text(self.medium_font, f"Final Score: {self.player.score}/5", RED, 50, 190)
         self.draw_text(self.font, "RIGHT-CLICK TO CONTINUE PLAYING", BLACK, 320, 550)
         self.draw_text(self.font, "PRESS-ENTER TO END GAME", BLACK, 360, 600)
 
-    def start_game(self):
+    def start_game(self) -> None:
         self.clock.tick(30)
         running = True
         while running:
@@ -423,7 +397,7 @@ class Gameplay:
 
         pygame.quit()
 
-def main():
+def main() -> None:
     gameplay = Gameplay()
     gameplay.start_game()
 
