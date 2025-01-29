@@ -77,11 +77,11 @@ class Quizzes_data:
         self.all_quizzes = self.my_data["all_quizzes"]
 
     def record_data(self, is_new_quiz: bool, q_idx: int, topic: str, data: dict[str, any]) -> None:
+        data["correct_percentage"] = 100 * (data["total_score"] / (5*data["use_count"]))
         if not is_new_quiz:
             if not self.all_quizzes[q_idx]["use_count"] >= 10:
                 data["total_score"] += self.all_quizzes[q_idx]["total_score"]
                 data["use_count"] = self.all_quizzes[q_idx]["use_count"] + 1
-            data["correct_percentage"] = 100 * (data["total_score"] / (5*data["use_count"]))
             self.my_data["all_quizzes"][q_idx] = data
             with open(DATA_PATH, "w") as file:
                 json.dump(self.my_data, file, indent=4)
@@ -142,7 +142,8 @@ class Gameplay:
         self.q_number = 0
         self.is_new_quiz = True
         self.q_idx = 0
-    
+        self.setup_display()
+
     def setup_display(self) -> None:
         self.clock = pygame.time.Clock()
         self.font = pygame.font.SysFont(None, 30)
@@ -381,9 +382,10 @@ class Gameplay:
                 self.extract_response(response=response)
                 self.stage = GameStage.QUIZ
             elif self.stage == GameStage.QUIZ:
-                if self.q_number >= 5:
+                if self.q_number < 5:
+                    self.draw_interface()
+                else:
                     self.stage = GameStage.UPDATE
-                self.draw_interface()
             elif self.stage == GameStage.CORRECT:
                 self.show_correct_interface()
             elif self.stage == GameStage.INCORRECT:
