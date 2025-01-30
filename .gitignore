@@ -1,5 +1,6 @@
 test/
-database/
+database/plot/
+database/quizzes_data.json
 .env
 flow.txt
 log/
