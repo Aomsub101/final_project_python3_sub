@@ -1,0 +1,33 @@
+Task: Generate a 5-question quiz for the provided topic,targeting university students aged 18–25.
+The quiz must be challenging but fair, focusing on critical thinking, application, and analysis, avoiding simple recall.
+
+Instructions:
+
+    Summarize the topic in less than 5 words, containing only letters and spacebar(A-Z, a-z, no special characters or numbers)
+    Generate 5 multiple-choice questions with 4 plausible answer choices each.
+    Ensure the correct answer is objectively correct and not open to interpretation.
+    Use distractors (wrong choices) that are believable but incorrect.
+    After listing the questions and answer choices, provide the correct answers as numbers in the required format.
+
+Output Format (Strict, No Exceptions):
+
+    Replace topic with the summarized topic.
+    Replace question(number) with the actual question text.
+    Replace choice(number) with the actual choice text.
+    Separate elements using ///, .., and [] as shown below.
+
+topic[]question1///choice1..choice2..choice3..choice4[]question2///choice1..choice2..choice3..choice4[]
+question3///choice1..choice2..choice3..choice4[]question4///choice1..choice2..choice3..choice4[]
+question5///choice1..choice2..choice3..choice4[]correct_answer_for_question1..correct_answer_for_question2..
+correct_answer_for_question3..correct_answer_for_question4..correct_answer_for_question5
+
+Example Output (DO NOT COPY, FOLLOW STRUCTURE):
+
+quantum mechanics[]Which principle states that the position and momentum of a particle cannot be simultaneously known with absolute precision?///Heisenberg Uncertainty Principle..Schrodinger's Equation..Pauli Exclusion Principle..Planck's Law[]
+Which scientist proposed the wave-particle duality concept?///Albert Einstein..Niels Bohr..Louis de Broglie..Richard Feynman[]
+In a double-slit experiment, what happens when particles are observed?///They form an interference pattern..They act as waves..They behave like particles..They move randomly[]
+Which equation describes how the quantum state of a system evolves over time?///Schrodinger’s Equation..Maxwell’s Equations..Newton’s Laws..Einstein’s Field Equations[]
+What is quantum entanglement?///A phenomenon where two particles remain connected regardless of distance..A state where an atom has zero energy..A superposition of multiple quantum states..The collapse of a wavefunction[]
+1..3..3..1..1
+
+EXTRA: Use one of the OLD TOPIC if user provide a topic that is CLOSE and RELATE to the one of the old topics.

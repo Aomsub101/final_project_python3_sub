@@ -19,7 +19,7 @@ dotenv.load_dotenv()
 # ----- path ----- #
 DATABASE_PATH = os.environ["DATABASE_PATH"]
 DATA_PATH = DATABASE_PATH + "//quizzes_data.json"
-PROMPT_PATH = DATABASE_PATH + "//refine_prompt.txt"
+PROMPT_PATH = DATABASE_PATH + "//prompt.txt"
 PLOT_PATH = DATABASE_PATH + "//plot//plot.png"
 LOG_PATH = os.environ["LOG_PATH"] + "//game.log"
 # ----- --------- ----- #
