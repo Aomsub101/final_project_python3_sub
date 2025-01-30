@@ -90,7 +90,7 @@ class Quizzes_data:
         return sorted(leaderboard, key=lambda x: x["correct_percentage"], reverse=True)
 
     def record_data(self, is_new_quiz: bool, q_idx: int, topic: str, data: dict[str, any]) -> None:
-        if not is_new_quiz and not self.all_quizzes[q_idx]["use_count"] >= 10:
+        if not is_new_quiz and self.all_quizzes[q_idx]["use_count"] < 10:
             data["all_score"] += self.all_quizzes[q_idx]["all_score"]
             data["use_count"] = self.all_quizzes[q_idx]["use_count"] + 1
             data["correct_percentage"] = round(100 * sum(data["all_score"]) /(5 * data["use_count"]), 3)
@@ -179,7 +179,7 @@ class Gameplay:
         if self.topic in [t.lower() for t in self.quizzes_data.all_topics]:
             self.is_new_quiz = False
             self.q_idx = self.quizzes_data.all_topics.index(self.topic)
-        if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] <= 10:
+        if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] < 10:
             self.use_exist_quiz()
             logger.info(
                 "Use old quizzes on topic: (%s)",
