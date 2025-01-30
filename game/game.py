@@ -8,16 +8,25 @@ from enum import Enum
 from mistralai import Mistral
 import logging
 from logging.handlers import RotatingFileHandler
+import numpy as np
+import matplotlib.pyplot as plt
 # ----- --------- ----- #
 
 # ----- load environment variables ----- #
 dotenv.load_dotenv()
 # ----- -------------------------- ----- #
 
+# ----- path ----- #
+DATABASE_PATH = os.environ["DATABASE_PATH"]
+DATA_PATH = DATABASE_PATH + "//quizzes_data.json"
+PROMPT_PATH = DATABASE_PATH + "//refine_prompt.txt"
+PLOT_PATH = DATABASE_PATH + "//plot//plot.png"
+LOG_PATH = os.environ["LOG_PATH"] + "//game.log"
+# ----- --------- ----- #
+
 # ----- setup logger ----- #
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
-LOG_PATH = os.environ["LOG_PATH"] + "//game.log"
 handler = RotatingFileHandler(
     LOG_PATH,
     maxBytes=1_000_000,
@@ -59,10 +68,6 @@ BLUE = (69,163,229)
 LIGHT_PURPLE = (203, 195, 227)
 # ------ ---- ----- #
 
-# ----- path ----- #
-DATA_PATH = os.environ["DATABASE_PATH"] + "//quizzes_data.json"
-PROMPT_PATH = os.environ["DATABASE_PATH"] + "//refine_prompt.txt"
-# ----- --------- ----- #
 
 class Player:
     def __init__(self):
@@ -75,21 +80,28 @@ class Quizzes_data:
         self.my_data = self.get_data()
         self.all_topics = self.my_data["all_topics"]
         self.all_quizzes = self.my_data["all_quizzes"]
+        self.leaderboard = self.get_leaderboard()
+
+    def get_leaderboard(self):
+        leaderboard = []
+        for quiz in self.all_quizzes:
+            if quiz["use_count"] >= 5 and quiz["correct_percentage"] <= 90:
+                leaderboard.append(quiz)
+        return sorted(leaderboard, key=lambda x: x["correct_percentage"], reverse=True)
 
     def record_data(self, is_new_quiz: bool, q_idx: int, topic: str, data: dict[str, any]) -> None:
-        data["correct_percentage"] = 100 * (data["total_score"] / (5*data["use_count"]))
-        if not is_new_quiz:
-            if not self.all_quizzes[q_idx]["use_count"] >= 10:
-                data["total_score"] += self.all_quizzes[q_idx]["total_score"]
-                data["use_count"] = self.all_quizzes[q_idx]["use_count"] + 1
+        if not is_new_quiz and not self.all_quizzes[q_idx]["use_count"] >= 10:
+            data["all_score"] += self.all_quizzes[q_idx]["all_score"]
+            data["use_count"] = self.all_quizzes[q_idx]["use_count"] + 1
+            data["correct_percentage"] = round(100 * sum(data["all_score"]) /(5 * data["use_count"]), 3)
             self.my_data["all_quizzes"][q_idx] = data
-            with open(DATA_PATH, "w") as file:
-                json.dump(self.my_data, file, indent=4)
         else:
+            data["correct_percentage"] = round(100 * data["all_score"][0] /5, 3)
             self.my_data["all_quizzes"].append(data)
             self.my_data["all_topics"].append(topic)
-            with open(DATA_PATH, "w") as file:
-                json.dump(self.my_data, file, indent=4)
+
+        with open(DATA_PATH, "w") as file:
+            json.dump(self.my_data, file, indent=4)
 
     def get_data(self) -> dict[str, any]:
         with open(DATA_PATH, "r") as file:
@@ -102,8 +114,8 @@ class MistralAI:
         with open(PROMPT_PATH, "r") as file:
             self.prompt = file.read()
 
-    def call(self, topic: str) -> str:
-        full_prompt = self.prompt + "\nUSER PROMPT:" + topic
+    def call(self, topic: str, old_topic: list) -> str:
+        full_prompt = self.prompt + f"\nOLD TOPIC: {old_topic}" + "\nUSER PROMPT:" + topic
         try:
             response = self.client.chat.complete(
                 model = self.model,
@@ -129,6 +141,9 @@ class GameStage(Enum):
     UPDATE = "update"
     END = "end"
     LEAVE = "leave"
+    LEADERBOARD = "leaderboard"
+    PERFORMANCE = "performance"
+    PLOT = "plot"
 
 class Gameplay:
     def __init__(self) -> None:
@@ -159,12 +174,12 @@ class Gameplay:
 
     def extract_response(self, response: str) -> None:
         response = response.split('[]')
-        self.topic = response[0]
-        self.player.topic = self.topic
-        if self.topic in self.quizzes_data.all_topics:
+        self.topic = response[0].lower()
+
+        if self.topic in [t.lower() for t in self.quizzes_data.all_topics]:
             self.is_new_quiz = False
             self.q_idx = self.quizzes_data.all_topics.index(self.topic)
-        if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] < 10:
+        if not self.is_new_quiz and self.quizzes_data.all_quizzes[self.q_idx]["use_count"] <= 10:
             self.use_exist_quiz()
             logger.info(
                 "Use old quizzes on topic: (%s)",
@@ -340,13 +355,82 @@ class Gameplay:
         self.draw_text(self.font, self.choices[self.q_number][2], WHITE, 100, 690, 450, 750, is_choice=True)
         self.draw_text(self.font, self.choices[self.q_number][3], WHITE, 600, 690, 950, 750, is_choice=True)
 
+    def show_options(self) -> None:
+        pygame.draw.rect(self.surface, RED, pygame.Rect(340, 710, 280, 40))
+        pygame.draw.rect(self.surface, RED, pygame.Rect(690, 710, 230, 40))
+        self.draw_text(self.font, "QUIZ LEADERBOARD", BLACK, 700, 720)
+        self.draw_text(self.font, "TOP QUIZ PERFORMANCE", BLACK, 350, 720)
+
+    def check_option(self, pos: tuple[int, int]) -> None:
+        x, y = pos
+        if 690 < x < 920 and 710 < y < 750:
+            self.stage = GameStage.LEADERBOARD
+            logger.info(
+                "Player (%s) see top 5 quizzes.",
+                self.player.name
+            )
+        elif 340 < x < 620 and 710 < y < 750:
+            self.stage = GameStage.PERFORMANCE
+            logger.info(
+                "Player (%s) see performance of top 5 quizzes.",
+                self.player.name
+            )
+
+    def show_rank(self, option:str) -> None:
+        if option == "leaderboard":
+            self.draw_text(self.medium_font, "Top 5 Quality quiz!",BLUE, 100, 50)
+        else:
+            self.draw_text(self.medium_font, "Select the quiz!",BLUE, 100, 50)
+        for idx, quiz in enumerate(self.quizzes_data.leaderboard):
+            if idx < 5:
+                self.draw_text(self.font,
+                               f"{idx+1}.{quiz["topic"]} - correct_rate: {quiz["correct_percentage"]}",
+                               BLUE,
+                               100,
+                               110 + (40*idx)
+                )
+            else:
+                break
+    
+    def check_plot(self, pos: tuple[int, int]) -> None:
+        y = pos[1]
+        y_list = [140, 180, 220, 260, 300]
+        if y > 100:
+            for idx, y_bottom in enumerate(y_list):
+                if y < y_bottom:
+                    return idx
+        return
+
+    def plot(self, choice: int) -> None:
+        topic = self.quizzes_data.leaderboard[choice]["topic"]
+        logger.info(
+                "Player (%s) see performance on (%s)",
+                self.player.name,
+                topic
+            )
+        data = self.quizzes_data.leaderboard[choice]["all_score"]
+        values, counts = np.unique(data, return_counts=True)
+
+        plt.bar(values, counts, color='skyblue')
+        plt.xlabel("Score")
+        plt.ylabel("Count")
+        plt.title(f"Player's score on topic: {topic}")
+        plt.savefig(PLOT_PATH)
+        plt.close()
+
+    def show_plot(self):
+        imp = pygame.image.load(PLOT_PATH).convert()
+        self.surface.blit(imp, (0, 0))
+        self.draw_text(self.font, "PRESS-ENTER TO EXIT", BLACK, 360, 600)
+
     def make_json(self) -> dict[str, any]:
         data = {
+            "topic": self.topic,
             "questions": self.questions,
             "choices": self.choices,
             "correct_answers": self.correct_answers,
             "use_count": 1,
-            "total_score": self.player.score,
+            "all_score": [self.player.score],
             "correct_percentage": 0
         }
         return data
@@ -367,13 +451,15 @@ class Gameplay:
 
     def end_game(self) -> None:
         self.draw_text(self.medium_font, f"Name: {self.player.name}", RED, 50, 50)
-        self.draw_text(self.medium_font, f"Topic: {self.player.topic}", RED, 50, 120)
+        self.draw_text(self.medium_font, f"Topic: {self.topic}", RED, 50, 120)
         self.draw_text(self.medium_font, f"Final Score: {self.player.score}/5", RED, 50, 190)
         self.draw_text(self.font, "RIGHT-CLICK TO CONTINUE PLAYING", BLACK, 320, 550)
         self.draw_text(self.font, "PRESS-ENTER TO END GAME", BLACK, 360, 600)
 
     def start_game(self) -> None:
         self.clock.tick(30)
+        tmp_stage = ""
+        plt_choice = None
         running = True
         while running:
             self.surface.fill(WHITE)
@@ -391,21 +477,47 @@ class Gameplay:
                 if event.type == pygame.KEYDOWN:
                     if self.stage == GameStage.NAME:
                         self.handle_name_input(event)
+                    
                     elif self.stage == GameStage.TOPIC:
                         self.handle_topic_input(event)
+                    
+                    elif self.stage in [GameStage.LEADERBOARD, GameStage.PERFORMANCE]:
+                        if event.key == pygame.K_RETURN:
+                            self.stage = tmp_stage
+
+                    elif self.stage == GameStage.PLOT:
+                        if event.key == pygame.K_RETURN:
+                            self.stage = GameStage.PERFORMANCE
+
                     elif self.stage in [GameStage.CORRECT, GameStage.INCORRECT]:
                         if event.key == pygame.K_RETURN:
                             self.stage = GameStage.QUIZ
                             self.q_number += 1
+                    
                     elif self.stage == GameStage.END:
                         if event.key == pygame.K_RETURN:
                             self.stage = GameStage.LEAVE
+
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    if self.stage == GameStage.QUIZ:
-                        mouse_pos = pygame.mouse.get_pos()
-                        answer = self.handle_quiz_input(mouse_pos)
-                        self.check_answer(answer)
-                    if self.stage == GameStage.END:
+                    if event.button == 1:
+                        if self.stage in [GameStage.NAME, GameStage.TOPIC]:
+                            tmp_stage = self.stage
+                            mouse_pos = pygame.mouse.get_pos()
+                            self.check_option(mouse_pos)
+
+                        elif self.stage == GameStage.PERFORMANCE:
+                            mouse_pos = pygame.mouse.get_pos()
+                            plt_choice = self.check_plot(mouse_pos)
+                            if plt_choice is not None:
+                                self.stage = GameStage.PLOT
+                                self.plot(plt_choice)
+
+                        elif self.stage == GameStage.QUIZ:
+                            mouse_pos = pygame.mouse.get_pos()
+                            answer = self.handle_quiz_input(mouse_pos)
+                            self.check_answer(answer)
+
+                    elif self.stage == GameStage.END:
                         if event.button == 3:
                             self.stage = GameStage.TOPIC
                             self.player.score = 0
@@ -418,28 +530,46 @@ class Gameplay:
             if self.stage == GameStage.NAME:
                 self.draw_text(self.font, "Welcome to the quiz game!", RED, 50, 50)
                 self.draw_text(self.font, f"Please enter your name: {self.player.name}|", RED, 50, 80)
+                self.show_options()
+
             elif self.stage == GameStage.TOPIC:
                 self.draw_text(self.font, f"Hi! {self.player.name}", RED, 50, 50)
                 self.draw_text(self.font, "What topic do you want to quiz?", RED, 50, 80)
                 self.draw_text(self.font, f"Enter topic: {self.player.topic}|", RED, 50, 110)
+                self.show_options()
+
+            elif self.stage == GameStage.LEADERBOARD:
+                self.show_rank("leaderboard")
+
+            elif self.stage == GameStage.PERFORMANCE:
+                self.show_rank("performance")
+            
+            elif self.stage == GameStage.PLOT:
+                self.show_plot()
+
             elif self.stage == GameStage.GENERATE_QUIZ:
                 print(f"generating quizzes for {self.player.topic}, please wait...")
                 self.draw_text(self.font, "generating quizzes, please wait...", RED, 50, 50)
-                response = self.mistral_ai.call(self.player.topic)
+                response = self.mistral_ai.call(self.player.topic, self.quizzes_data.all_topics)
                 logger.info(response)
                 self.extract_response(response=response)
                 self.stage = GameStage.QUIZ
+
             elif self.stage == GameStage.QUIZ:
                 if self.q_number < 5:
                     self.draw_interface()
                 else:
                     self.stage = GameStage.UPDATE
+
             elif self.stage == GameStage.CORRECT:
                 self.show_correct_interface()
+
             elif self.stage == GameStage.INCORRECT:
                 self.show_incorrect_interface()
+
             elif self.stage == GameStage.UPDATE:
                 self.update()
+
             elif self.stage == GameStage.END:
                 self.end_game()
 
