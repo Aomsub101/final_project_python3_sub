@@ -82,7 +82,7 @@ class Quizzes_data:
         self.all_quizzes = self.my_data["all_quizzes"]
         self.leaderboard = self.get_leaderboard()
 
-    def get_leaderboard(self):
+    def get_leaderboard(self) -> None:
         leaderboard = []
         for quiz in self.all_quizzes:
             if quiz["use_count"] >= 5 and quiz["correct_percentage"] <= 90:
@@ -420,7 +420,7 @@ class Gameplay:
 
     def show_plot(self):
         imp = pygame.image.load(PLOT_PATH).convert()
-        self.surface.blit(imp, (0, 0))
+        self.surface.blit(imp, (180, 0))
         self.draw_text(self.font, "PRESS-ENTER TO EXIT", BLACK, 360, 600)
 
     def make_json(self) -> dict[str, any]:
