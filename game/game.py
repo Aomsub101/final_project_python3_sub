@@ -385,7 +385,7 @@ class Gameplay:
         for idx, quiz in enumerate(self.quizzes_data.leaderboard):
             if idx < 5:
                 self.draw_text(self.font,
-                               f"{idx+1}.{quiz["topic"]} - correct_rate: {quiz["correct_percentage"]}",
+                               f"{idx+1}.{quiz["topic"]} - correct_rate: {quiz["correct_percentage"]}%",
                                BLUE,
                                100,
                                110 + (40*idx)
