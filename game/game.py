@@ -381,6 +381,7 @@ class Gameplay:
             self.draw_text(self.medium_font, "Top 5 Quality quiz!",BLUE, 100, 50)
         else:
             self.draw_text(self.medium_font, "Select the quiz!",BLUE, 100, 50)
+        self.draw_text(self.font, "PRESS-ENTER TO EXIT", BLACK, 360, 600)
         for idx, quiz in enumerate(self.quizzes_data.leaderboard):
             if idx < 5:
                 self.draw_text(self.font,
